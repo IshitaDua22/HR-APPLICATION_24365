@@ -1,0 +1,35 @@
+-- Table for Departments
+CREATE TABLE departments (
+    department_id SERIAL PRIMARY KEY,
+    department_name VARCHAR(255) NOT NULL UNIQUE
+);
+
+-- Table for Employee Records
+CREATE TABLE employees (
+    employee_id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE,
+    job_title VARCHAR(255),
+    start_date DATE NOT NULL,
+    department_id INTEGER REFERENCES departments(department_id)
+);
+
+-- Table for Performance Reviews
+CREATE TABLE performance_reviews (
+    review_id SERIAL PRIMARY KEY,
+    employee_id INTEGER REFERENCES employees(employee_id),
+    review_date DATE NOT NULL,
+    reviewer_name VARCHAR(255),
+    review_score DECIMAL(5, 2),
+    comments TEXT
+);
+
+-- Table for Leave Requests
+CREATE TABLE leave_requests (
+    leave_id SERIAL PRIMARY KEY,
+    employee_id INTEGER REFERENCES employees(employee_id),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    leave_type VARCHAR(50),
+    status VARCHAR(50) DEFAULT 'Pending'
+);
