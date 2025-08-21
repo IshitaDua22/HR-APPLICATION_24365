@@ -1,0 +1,201 @@
+import streamlit as st
+import pandas as pd
+from datetime import date
+import altair as alt
+from Backend import (
+    add_employee, update_employee, get_all_employees, get_employee_by_id,
+    get_departments, add_department, log_performance_review,
+    record_leave_request, get_employee_count_by_department
+)
+
+st.set_page_config(
+    page_title="HR Employee Manager",
+    page_icon="🏢",
+    layout="wide"
+)
+
+st.title("HR Employee Manager 🏢")
+st.write("Centralized dashboard for workforce management.")
+
+# --- Navigation ---
+st.sidebar.header("Navigation")
+page = st.sidebar.radio("Go to", ["Dashboard", "Employee Management", "Performance & Leave"])
+
+if page == "Dashboard":
+    st.header("Workforce Overview")
+    
+    # Key Metrics
+    departments_data = get_employee_count_by_department()
+    total_employees = sum([count for _, count in departments_data])
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Total Employees", total_employees)
+    with col2:
+        st.metric("Total Departments", len(departments_data))
+
+    st.write("---")
+
+    # Employees by Department Chart
+    st.subheader("Employees by Department")
+    if departments_data:
+        df_departments = pd.DataFrame(departments_data, columns=["Department", "Employee Count"])
+        chart = alt.Chart(df_departments).mark_bar().encode(
+            x=alt.X('Department', sort='-y'),
+            y='Employee Count',
+            tooltip=['Department', 'Employee Count']
+        ).properties(
+            title="Employee Distribution by Department"
+        )
+        st.altair_chart(chart, use_container_width=True)
+    else:
+        st.info("No departments or employee data to display.")
+
+    st.write("---")
+
+    # Employee Table
+    st.subheader("All Employees")
+    employees = get_all_employees()
+    if employees:
+        df_employees = pd.DataFrame(employees, columns=[
+            "ID", "Name", "Email", "Job Title", "Start Date", "Department"
+        ])
+        st.dataframe(df_employees, use_container_width=True)
+    else:
+        st.info("No employee records found.")
+
+elif page == "Employee Management":
+    st.header("Employee Records")
+
+    # Add Employee Form
+    with st.expander("Add New Employee", expanded=False):
+        st.subheader("Add New Employee")
+        departments = get_departments()
+        department_names = [d[1] for d in departments]
+        department_dict = {d[1]: d[0] for d in departments}
+        
+        with st.form("add_employee_form"):
+            name = st.text_input("Name")
+            email = st.text_input("Email")
+            job_title = st.text_input("Job Title")
+            start_date = st.date_input("Start Date", date.today())
+            selected_dept_name = st.selectbox("Department", options=[""] + department_names)
+            
+            submit_add = st.form_submit_button("Add Employee")
+            
+            if submit_add:
+                if name and email and selected_dept_name:
+                    department_id = department_dict[selected_dept_name]
+                    if add_employee(name, email, job_title, start_date, department_id):
+                        st.success("Employee added successfully!")
+                    else:
+                        st.error("Failed to add employee. Email might already exist.")
+                else:
+                    st.warning("Please fill in all required fields.")
+                    
+    # Update Employee Form
+    st.subheader("Update Existing Employee")
+    employees = get_all_employees()
+    employee_names = [emp[1] for emp in employees]
+    
+    selected_employee_name = st.selectbox("Select Employee to Update", [""] + employee_names)
+    
+    if selected_employee_name:
+        employee_data = next(emp for emp in employees if emp[1] == selected_employee_name)
+        employee_id, _, current_email, current_job_title, _, current_dept_name = employee_data
+        
+        departments = get_departments()
+        department_names = [d[1] for d in departments]
+        department_dict = {d[1]: d[0] for d in departments}
+
+        with st.form("update_employee_form"):
+            new_name = st.text_input("Name", value=selected_employee_name)
+            new_email = st.text_input("Email", value=current_email)
+            new_job_title = st.text_input("Job Title", value=current_job_title)
+            selected_new_dept_name = st.selectbox("Department", options=department_names, index=department_names.index(current_dept_name) if current_dept_name in department_names else 0)
+
+            submit_update = st.form_submit_button("Update Employee")
+
+            if submit_update:
+                if new_name and new_email and selected_new_dept_name:
+                    new_department_id = department_dict[selected_new_dept_name]
+                    if update_employee(employee_id, new_name, new_email, new_job_title, new_department_id):
+                        st.success("Employee updated successfully!")
+                    else:
+                        st.error("Failed to update employee.")
+                else:
+                    st.warning("Please fill in all required fields.")
+
+    # Department Management
+    with st.expander("Manage Departments", expanded=False):
+        st.subheader("Add New Department")
+        with st.form("add_department_form"):
+            new_dept_name = st.text_input("Department Name")
+            submit_dept = st.form_submit_button("Add Department")
+            if submit_dept:
+                if new_dept_name:
+                    if add_department(new_dept_name):
+                        st.success(f"Department '{new_dept_name}' added.")
+                    else:
+                        st.error("Failed to add department. It might already exist.")
+                else:
+                    st.warning("Please enter a department name.")
+        
+        st.subheader("Existing Departments")
+        departments = get_departments()
+        if departments:
+            df_depts = pd.DataFrame(departments, columns=["ID", "Department Name"])
+            st.dataframe(df_depts, use_container_width=True)
+        else:
+            st.info("No departments found.")
+
+
+elif page == "Performance & Leave":
+    st.header("Performance & Leave Tracking")
+
+    # Log Performance Review
+    st.subheader("Log Performance Review")
+    employees = get_all_employees()
+    employee_dict = {emp[1]: emp[0] for emp in employees}
+    employee_names = list(employee_dict.keys())
+    
+    with st.form("review_form"):
+        selected_employee = st.selectbox("Select Employee", options=[""] + employee_names)
+        review_date = st.date_input("Review Date", date.today())
+        reviewer_name = st.text_input("Reviewer Name")
+        review_score = st.number_input("Review Score (1-10)", min_value=1.0, max_value=10.0, step=0.1)
+        comments = st.text_area("Comments")
+        
+        submit_review = st.form_submit_button("Submit Review")
+        
+        if submit_review:
+            if selected_employee and reviewer_name and comments:
+                employee_id = employee_dict[selected_employee]
+                if log_performance_review(employee_id, review_date, reviewer_name, review_score, comments):
+                    st.success("Performance review logged successfully!")
+                else:
+                    st.error("Failed to log performance review.")
+            else:
+                st.warning("Please fill in all required fields.")
+
+    st.write("---")
+
+    # Record Leave Request
+    st.subheader("Record Leave Request")
+    with st.form("leave_form"):
+        selected_employee_leave = st.selectbox("Select Employee", options=[""] + employee_names, key="leave_employee")
+        start_date = st.date_input("Start Date", date.today())
+        end_date = st.date_input("End Date", date.today())
+        leave_type = st.selectbox("Leave Type", options=["Sick Leave", "Vacation", "Other"])
+        
+        submit_leave = st.form_submit_button("Record Leave")
+        
+        if submit_leave:
+            if selected_employee_leave and start_date and end_date:
+                employee_id = employee_dict[selected_employee_leave]
+                if record_leave_request(employee_id, start_date, end_date, leave_type):
+                    st.success("Leave request recorded successfully!")
+                else:
+                    st.error("Failed to record leave request.")
+            else:
+                st.warning("Please fill in all required fields.")
