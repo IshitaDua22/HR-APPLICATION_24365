@@ -1,0 +1,187 @@
+import psycopg2
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+DB_NAME = os.getenv('HR MANAGER')
+DB_USER = os.getenv('postgres')
+DB_PASS = os.getenv('Iamstrong22082000!')
+DB_HOST = os.getenv('localhost')
+
+def get_db_connection():
+    """Establishes a connection to the PostgreSQL database."""
+    try:
+        conn = psycopg2.connect(
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASS,
+            host=DB_HOST
+        )
+        return conn
+    except psycopg2.Error as e:
+        print(f"Error connecting to the database: {e}")
+        return None
+
+# --- Employee Management ---
+def add_employee(name, email, job_title, start_date, department_id):
+    """Adds a new employee record."""
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO employees (name, email, job_title, start_date, department_id) VALUES (%s, %s, %s, %s, %s)",
+                    (name, email, job_title, start_date, department_id)
+                )
+                conn.commit()
+                return True
+        except psycopg2.Error as e:
+            print(f"Error adding employee: {e}")
+            conn.rollback()
+        finally:
+            conn.close()
+    return False
+
+def update_employee(employee_id, name, email, job_title, department_id):
+    """Updates an existing employee's details."""
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE employees SET name = %s, email = %s, job_title = %s, department_id = %s WHERE employee_id = %s",
+                    (name, email, job_title, department_id, employee_id)
+                )
+                conn.commit()
+                return True
+        except psycopg2.Error as e:
+            print(f"Error updating employee: {e}")
+            conn.rollback()
+        finally:
+            conn.close()
+    return False
+
+def get_all_employees():
+    """Fetches all employee records with department names."""
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT e.employee_id, e.name, e.email, e.job_title, e.start_date, d.department_name "
+                    "FROM employees e LEFT JOIN departments d ON e.department_id = d.department_id ORDER BY e.name"
+                )
+                return cur.fetchall()
+        except psycopg2.Error as e:
+            print(f"Error fetching employees: {e}")
+            return []
+        finally:
+            conn.close()
+    return []
+
+def get_employee_by_id(employee_id):
+    """Fetches a single employee record by ID."""
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM employees WHERE employee_id = %s", (employee_id,))
+                return cur.fetchone()
+        except psycopg2.Error as e:
+            print(f"Error fetching employee: {e}")
+            return None
+        finally:
+            conn.close()
+    return None
+
+# --- Department Management ---
+def get_departments():
+    """Fetches all departments."""
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT department_id, department_name FROM departments ORDER BY department_name")
+                return cur.fetchall()
+        except psycopg2.Error as e:
+            print(f"Error fetching departments: {e}")
+            return []
+        finally:
+            conn.close()
+    return []
+
+def add_department(department_name):
+    """Adds a new department."""
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("INSERT INTO departments (department_name) VALUES (%s)", (department_name,))
+                conn.commit()
+                return True
+        except psycopg2.Error as e:
+            print(f"Error adding department: {e}")
+            conn.rollback()
+        finally:
+            conn.close()
+    return False
+
+# --- Performance & Leave Tracking ---
+def log_performance_review(employee_id, review_date, reviewer_name, review_score, comments):
+    """Logs a performance review for an employee."""
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO performance_reviews (employee_id, review_date, reviewer_name, review_score, comments) VALUES (%s, %s, %s, %s, %s)",
+                    (employee_id, review_date, reviewer_name, review_score, comments)
+                )
+                conn.commit()
+                return True
+        except psycopg2.Error as e:
+            print(f"Error logging review: {e}")
+            conn.rollback()
+        finally:
+            conn.close()
+    return False
+
+def record_leave_request(employee_id, start_date, end_date, leave_type):
+    """Records an employee leave request."""
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO leave_requests (employee_id, start_date, end_date, leave_type) VALUES (%s, %s, %s, %s)",
+                    (employee_id, start_date, end_date, leave_type)
+                )
+                conn.commit()
+                return True
+        except psycopg2.Error as e:
+            print(f"Error recording leave request: {e}")
+            conn.rollback()
+        finally:
+            conn.close()
+    return False
+
+def get_employee_count_by_department():
+    """Returns a count of employees in each department."""
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT d.department_name, COUNT(e.employee_id) FROM departments d "
+                    "LEFT JOIN employees e ON d.department_id = e.department_id "
+                    "GROUP BY d.department_name ORDER BY d.department_name"
+                )
+                return cur.fetchall()
+        except psycopg2.Error as e:
+            print(f"Error getting department counts: {e}")
+            return []
+        finally:
+            conn.close()
+    return []
+# HR-APPLICATION_24365
